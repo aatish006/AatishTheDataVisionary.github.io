@@ -47,6 +47,13 @@ interface Props {
   reducedMotion?: boolean;
   /** extra overlay content (ribbon, spine) rendered above pages */
   children?: ReactNode;
+  /** 'highlight' hands pointer input to `toolHandlers` instead of turning pages */
+  tool?: 'turn' | 'highlight';
+  toolHandlers?: {
+    down(e: React.PointerEvent): void;
+    move(e: React.PointerEvent): void;
+    up(e: React.PointerEvent): void;
+  };
 }
 
 const DRAG_START = 10;
@@ -299,12 +306,20 @@ export const BookStage = forwardRef<StageHandle, Props>(function BookStage(props
     return { x: e.clientX - r.left - rightX, y: e.clientY - r.top };
   };
 
+  const highlighting = props.tool === 'highlight' && props.toolHandlers;
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 || anim.current) return;
+    if (highlighting) {
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      props.toolHandlers!.down(e);
+      return;
+    }
     gesture.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), dragging: false, k: spread ? 1 : 1.7, samples: [{ x: e.clientX, t: performance.now() }] };
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (highlighting) return props.toolHandlers!.move(e);
     const g = gesture.current;
     if (!g || g.id !== e.pointerId) return;
     const dx = e.clientX - g.x0;
@@ -340,6 +355,7 @@ export const BookStage = forwardRef<StageHandle, Props>(function BookStage(props
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    if (highlighting) return props.toolHandlers!.up(e);
     const g = gesture.current;
     gesture.current = null;
     if (!g || g.id !== e.pointerId) return;
@@ -396,7 +412,7 @@ export const BookStage = forwardRef<StageHandle, Props>(function BookStage(props
   return (
     <div
       ref={rootRef}
-      className={`stage stage--${mode}${fading ? ' stage--fade' : ''}`}
+      className={`stage stage--${mode}${fading ? ' stage--fade' : ''}${highlighting ? ' stage--highlighting' : ''}`}
       key={reducedMotion ? fading : undefined}
       style={{ width: spread ? 2 * W : W, height: H }}
       onPointerDown={onPointerDown}

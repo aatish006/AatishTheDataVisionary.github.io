@@ -205,7 +205,27 @@ const SYNTHS: Record<AmbientId, Synth> = {
 class AmbientPlayer {
   private current: { id: AmbientId; gain: GainNode; stop: Stop } | null = null;
   private listeners = new Set<() => void>();
+  private sleepTimer = 0;
+  /** when the sleep timer will fade the sound out (ms epoch), or null */
+  sleepAt: number | null = null;
+  /** the chosen sleep timer length, for showing which option is on */
+  sleepMinutes: number | null = null;
   volume = 0.5;
+
+  /** Gently fade out after `minutes` (null cancels). For falling asleep to the rain. */
+  setSleep(minutes: number | null) {
+    window.clearTimeout(this.sleepTimer);
+    this.sleepAt = minutes ? Date.now() + minutes * 60000 : null;
+    this.sleepMinutes = minutes;
+    if (minutes) {
+      this.sleepTimer = window.setTimeout(() => {
+        this.sleepAt = null;
+        this.sleepMinutes = null;
+        this.pause(12);
+      }, minutes * 60000);
+    }
+    this.emit();
+  }
 
   get playing() {
     return this.current?.id ?? null;
@@ -263,22 +283,27 @@ class AmbientPlayer {
     }
   }
 
-  private fadeOutCurrent() {
+  private fadeOutCurrent(seconds = 1.1) {
     const cur = this.current;
     const c = getContext();
     if (!cur || !c) return;
     cur.gain.gain.cancelScheduledValues(c.currentTime);
     cur.gain.gain.setValueAtTime(cur.gain.gain.value, c.currentTime);
-    cur.gain.gain.linearRampToValueAtTime(0, c.currentTime + 1.1);
+    cur.gain.gain.linearRampToValueAtTime(0, c.currentTime + seconds);
     setTimeout(() => {
       cur.stop();
       cur.gain.disconnect();
-    }, 1250);
+    }, seconds * 1000 + 150);
     this.current = null;
   }
 
-  pause() {
-    this.fadeOutCurrent();
+  pause(fadeSeconds = 1.1) {
+    this.fadeOutCurrent(fadeSeconds);
+    if (fadeSeconds <= 1.1) {
+      window.clearTimeout(this.sleepTimer);
+      this.sleepAt = null;
+      this.sleepMinutes = null;
+    }
     this.emit();
   }
 }

@@ -4,7 +4,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UserBookState, UserId, UserPrefs } from '../types';
-import type { Remote, RemoteBook } from './remote';
+import type { Remote, RemoteBook, SharedHighlightRow } from './remote';
 
 export interface SupabaseConfig {
   supabaseUrl: string;
@@ -98,6 +98,12 @@ export async function supabaseRemote(cfg: SupabaseConfig, profile: UserId): Prom
     },
     async pushPrefs(prefs) {
       check(await sb.from('prefs').upsert({ user_id: uid, data: prefs, updated_at: prefs.updatedAt ?? 0 }));
+    },
+    async pullSharedHighlights() {
+      return check(await sb.from('shared_highlights').select('id, book_id, author, data, deleted, updated_at')) as SharedHighlightRow[];
+    },
+    async pushSharedHighlights(rows) {
+      if (rows.length) check(await sb.from('shared_highlights').upsert(rows.map((r) => ({ ...r, author_id: uid }))));
     },
     async upload(name, blob) {
       const path = `${uid}/${name}`;

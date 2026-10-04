@@ -8,8 +8,11 @@ import { openDemoBook } from '../lib/demoBooks';
 import { hapticTick } from '../lib/haptics';
 import { importerByFormat } from '../lib/importers';
 import type { ReaderDocument, TocEntry } from '../lib/importers/types';
-import { fetchBlob } from '../lib/cloud';
-import type { Bookmark, ReadingPosition } from '../lib/types';
+import { fetchBlob, onCloudChanges, partnerHighlights } from '../lib/cloud';
+import { partnerOf, type Bookmark, type Highlight, type PartnerHighlight, type ReadingPosition } from '../lib/types';
+import { uid } from '../lib/repository';
+import { caretAt, locateOffset, offsetOf, paintHtml, paintsFor, screenRects, snapToWords } from './highlights';
+import { HighlightPopover, type PopoverTarget } from './HighlightPopover';
 import { useLibrary } from '../state/library';
 import { BookStage, type PageSide, type StageHandle } from './BookStage';
 import { computeGeometry, FONT_STACK, readInsets, type Insets } from './layout';
@@ -17,6 +20,8 @@ import { BookOpening, FinishedCelebration, WelcomeBack } from './Overlays';
 import { Endpaper, FixedPage, FlowPage, PaperBack } from './PageView';
 import { locateAnchor, locateText, paginate, type Pagination, type SearchHit } from './paginate';
 import { ContentsPanel, SettingsPanel } from './ReaderPanels';
+
+const todayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 type Panel = null | 'contents' | 'settings';
 
@@ -34,7 +39,14 @@ function useReducedMotion() {
 
 const stripChapterPrefix = (t?: string) => t?.replace(/^Chapter \d+ · /, '');
 
-export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
+export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): void }) {
+  // Leaving is one-way: a double Escape or tap must not step back twice through history.
+  const exited = useRef(false);
+  const onExit = useCallback(() => {
+    if (exited.current) return;
+    exited.current = true;
+    exit();
+  }, [exit]);
   const lib = useLibrary();
   const { prefs, updatePrefs, user } = lib;
   const book = lib.allBooks.find((b) => b.id === bookId);
@@ -100,7 +112,10 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
   }, []);
 
   const fixedAspect = doc?.kind === 'fixed' ? doc.pageAspect(0) : undefined;
-  const geo = useMemo(() => computeGeometry(vp.w, vp.h, prefs, insets, fixedAspect), [vp.w, vp.h, prefs, insets, fixedAspect]);
+  const geo = useMemo(() => computeGeometry(vp.w, vp.h, prefs, insets, fixedAspect),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [vp.w, vp.h, prefs.width, insets, fixedAspect],
+  );
   const { layout, mode } = geo;
   const spread = mode === 'spread';
   const typoKey = `${prefs.font}|${prefs.fontSize}|${prefs.lineHeight}`;
@@ -296,8 +311,10 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
 
   // ---- turning -----------------------------------------------------------------------------------
   const stage = useRef<StageHandle>(null);
+  const lastActivity = useRef(Date.now());
   const onTurnStart = useCallback(
     (dir: 1 | -1) => {
+      lastActivity.current = Date.now();
       if (prefs.pageSound) void playPageTurn(dir);
       if (prefs.haptics) hapticTick();
       if (geo.phone) setUi(false);
@@ -320,6 +337,7 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
   const onTap = useCallback(
     (zone: 'prev' | 'center' | 'next', target: EventTarget | null) => {
       const el = target as HTMLElement | null;
+      if (openMarkRef.current(el)) return;
       const link = el?.closest?.('a');
       if (link) {
         const internal = link.getAttribute('data-href');
@@ -365,7 +383,9 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
           jumpTo(N - 1);
           break;
         case 'Escape':
-          if (panel) setPanel(null);
+          if (popoverRef.current) setPopover(null);
+          else if (toolRef.current === 'highlight') setTool('turn');
+          else if (panel) setPanel(null);
           else onExit();
           break;
       }
@@ -382,6 +402,165 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
     else await lib.addBookmark(bookId, { position: posFromGlobal(primary), label: `${labelFor(primary)} · p. ${primary + 1}`, progress });
     if (prefs.haptics) hapticTick('medium');
   };
+
+  // ---- highlights ------------------------------------------------------------------------------------
+  const [tool, setTool] = useState<'turn' | 'highlight'>('turn');
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
+  const highlights = useMemo(() => saved.highlights ?? [], [saved.highlights]);
+  const [partnerHls, setPartnerHls] = useState<PartnerHighlight[]>([]);
+  const [popover, setPopover] = useState<PopoverTarget | null>(null);
+  const popoverRef = useRef(popover);
+  popoverRef.current = popover;
+  const [draft, setDraft] = useState<{ left: number; top: number; width: number; height: number }[]>([]);
+  const partner = partnerOf(user ?? 'aatish');
+  const canHighlight = doc?.kind === 'flow';
+
+  // Highlights the other reader left on this book (Our Shelf), refreshed whenever a sync brings news.
+  useEffect(() => {
+    if (!user || !book?.shared) {
+      setPartnerHls([]);
+      return;
+    }
+    const load = () => void partnerHighlights(user, bookId).then(setPartnerHls);
+    load();
+    const off = onCloudChanges(load);
+    return () => {
+      off();
+    };
+  }, [user, bookId, book?.shared]);
+
+  // Section HTML with highlights painted in, computed once per section and cached.
+  const painted = useMemo(() => {
+    const cache = new Map<number, string>();
+    return (section: number) => {
+      if (!doc || doc.kind !== 'flow') return '';
+      if (!cache.has(section)) cache.set(section, paintHtml(doc.sections[section].html, paintsFor(section, highlights, partnerHls)));
+      return cache.get(section)!;
+    };
+  }, [doc, highlights, partnerHls]);
+
+  const saveHighlights = (next: Highlight[]) => lib.patchState(bookId, { highlights: next });
+  const updateHighlight = (id: string, patch: Partial<Highlight>) =>
+    saveHighlights(highlights.map((h) => (h.id === id ? { ...h, ...patch, updatedAt: Date.now() } : h)));
+  const eraseHighlight = (id: string) => {
+    void saveHighlights(highlights.filter((h) => h.id !== id));
+    setPopover(null);
+    if (prefs.haptics) hapticTick();
+  };
+
+  /** If `el` is a painted highlight, open its popover. */
+  const openMarkRef = useRef<(el: HTMLElement | null) => boolean>(() => false);
+  openMarkRef.current = (el) => {
+    const mark = el?.closest?.('mark[data-hl]') as HTMLElement | null;
+    if (!mark) return false;
+    const id = mark.dataset.hl!;
+    const rect = mark.getBoundingClientRect();
+    const mine = highlights.find((h) => h.id === id);
+    if (mine) setPopover({ kind: 'mine', id, rect });
+    else {
+      const theirs = partnerHls.find((h) => h.id === id);
+      if (theirs) setPopover({ kind: 'partner', h: theirs, rect });
+    }
+    return true;
+  };
+
+  const stageEl = () => rootRef.current?.querySelector('.stage') as HTMLElement | null;
+  const drag = useRef<{ section: number; a: number; b: number; x: number; y: number; moved: boolean; target: EventTarget | null } | null>(null);
+  const caretIn = (x: number, y: number, section?: number) => {
+    const c = caretAt(x, y);
+    const host = c && (c.node.nodeType === Node.TEXT_NODE ? c.node.parentElement : (c.node as Element));
+    const flow = host?.closest?.('.flow[data-section]') as HTMLElement | null;
+    if (!c || !flow || flow.closest('.slot--hidden')) return null;
+    const s = Number(flow.dataset.section);
+    if (section !== undefined && s !== section) return null;
+    const off = offsetOf(flow, c.node, c.offset);
+    return off === null ? null : { section: s, offset: off, flow };
+  };
+  const draftRange = (d: { section: number; a: number; b: number }, flow: HTMLElement) => snapToWords(flow.textContent ?? '', d.a, d.b);
+  const toolHandlers = {
+    down(e: React.PointerEvent) {
+      lastActivity.current = Date.now();
+      const hit = caretIn(e.clientX, e.clientY);
+      drag.current = hit ? { section: hit.section, a: hit.offset, b: hit.offset, x: e.clientX, y: e.clientY, moved: false, target: e.target } : { section: -1, a: 0, b: 0, x: e.clientX, y: e.clientY, moved: false, target: e.target };
+    },
+    move(e: React.PointerEvent) {
+      const d = drag.current;
+      if (!d || d.section < 0) return;
+      if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+      d.moved = true;
+      const hit = caretIn(e.clientX, e.clientY, d.section);
+      if (!hit) return;
+      d.b = hit.offset;
+      const [s, en] = draftRange(d, hit.flow);
+      const st = stageEl();
+      if (!st) return;
+      const base = st.getBoundingClientRect();
+      setDraft(screenRects(st, d.section, s, en).map((r) => ({ left: r.left - base.left, top: r.top - base.top, width: r.width, height: r.height })));
+    },
+    up() {
+      const d = drag.current;
+      drag.current = null;
+      setDraft([]);
+      if (!d) return;
+      if (!d.moved) {
+        openMarkRef.current(d.target as HTMLElement);
+        return;
+      }
+      const st = stageEl();
+      const flow = st?.querySelector<HTMLElement>(`.slot:not(.slot--hidden) .flow[data-section="${d.section}"]`);
+      if (!st || !flow) return;
+      const [s, en] = draftRange(d, flow);
+      if (en - s < 1) return;
+      const text = (flow.textContent ?? '').slice(s, en);
+      const h: Highlight = { id: uid('hl_'), section: d.section, start: s, end: en, text, color: prefs.highlightColor ?? 'honey', createdAt: Date.now() };
+      void saveHighlights([...highlights, h]);
+      if (prefs.haptics) hapticTick();
+      const rects = screenRects(st, d.section, s, en);
+      const last = rects[rects.length - 1];
+      if (last) setPopover({ kind: 'mine', id: h.id, rect: last, fresh: true });
+    },
+  };
+
+  const goHighlight = async (h: Highlight) => {
+    if (!doc || doc.kind !== 'flow' || !pg || !measureRef.current) return;
+    const p = await locateOffset(doc, h.section, h.start, layout, measureRef.current);
+    jumpTo(pg.starts[h.section] + p);
+    if (geo.phone) setPanel(null);
+  };
+
+  // ---- reading diary: minutes actually spent reading, per day ------------------------------
+  const pendingMinutes = useRef(0);
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  const flushDiary = useRef(() => {});
+  flushDiary.current = () => {
+    const add = pendingMinutes.current;
+    if (add <= 0) return;
+    pendingMinutes.current = 0;
+    const diary = { ...(prefsRef.current.diary ?? {}) };
+    const k = todayKey();
+    diary[k] = Math.round(((diary[k] ?? 0) + add) * 10) / 10;
+    // keep about two months of history
+    for (const key of Object.keys(diary).sort().slice(0, -62)) delete diary[key];
+    updatePrefs({ diary });
+  };
+  useEffect(() => {
+    if (!started) return;
+    const tick = window.setInterval(() => {
+      // Count time only while the page is visible and someone has turned a page lately.
+      if (document.visibilityState === 'visible' && Date.now() - lastActivity.current < 3 * 60000) pendingMinutes.current += 0.25;
+    }, 15000);
+    const flush = window.setInterval(() => flushDiary.current(), 120000);
+    const onHide = () => document.visibilityState === 'hidden' && flushDiary.current();
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.clearInterval(tick);
+      window.clearInterval(flush);
+      document.removeEventListener('visibilitychange', onHide);
+      flushDiary.current();
+    };
+  }, [started]);
 
   // ---- navigation from panels ------------------------------------------------------------------
   const goToc = async (e: TocEntry) => {
@@ -420,7 +599,8 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
         <FlowPage
           side={side}
           layout={layout}
-          html={doc.sections[section].html}
+          html={painted(section)}
+          section={section}
           index={page}
           chapterStart={page === 0}
           head={side === 'left' ? book.title : title ?? book.title}
@@ -428,7 +608,7 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
         />
       );
     },
-    [doc, book, layout, N, locate],
+    [doc, book, layout, N, locate, painted],
   );
   const renderPaper = useCallback(() => <PaperBack layout={layout} />, [layout]);
 
@@ -492,8 +672,13 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
                 onTurnStart={onTurnStart}
                 onTap={onTap}
                 reducedMotion={reduced}
+                tool={tool}
+                toolHandlers={toolHandlers}
               >
                 {spread && <div className="stage__spine" aria-hidden />}
+                {draft.map((r, i) => (
+                  <div key={i} className={`hl-draft hl--${prefs.highlightColor ?? 'honey'}`} style={r} aria-hidden />
+                ))}
                 <button
                   className={`ribbon${here ? ' is-on' : ''}`}
                   style={{ left: spread ? layout.W * 2 - Math.max(56, layout.padR * 0.9) : layout.W - Math.max(44, layout.padR + 8) }}
@@ -533,6 +718,21 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
           <button className={`rbtn${panel === 'contents' ? ' is-on' : ''}`} onClick={() => setPanel((p) => (p === 'contents' ? null : 'contents'))} aria-label="Contents, bookmarks and search">
             <Icon name="contents" />
           </button>
+          {canHighlight && (
+            <button
+              className={`rbtn rbtn--highlighter${tool === 'highlight' ? ' is-on' : ''}`}
+              onClick={() => {
+                setTool((t) => (t === 'highlight' ? 'turn' : 'highlight'));
+                setPopover(null);
+              }}
+              aria-pressed={tool === 'highlight'}
+              aria-label={tool === 'highlight' ? 'Put the highlighter away' : 'Highlighter'}
+              title="Highlighter"
+            >
+              <Icon name="highlighter" />
+              <span className={`rbtn__ink hl--${prefs.highlightColor ?? 'honey'}`} aria-hidden />
+            </button>
+          )}
           <button className={`rbtn${panel === 'settings' ? ' is-on' : ''}`} onClick={() => setPanel((p) => (p === 'settings' ? null : 'settings'))} aria-label="Reading settings">
             <AaIcon size={22} />
           </button>
@@ -611,6 +811,10 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
             onGoBookmark={goBookmark}
             onRemoveBookmark={(b) => void lib.removeBookmark(bookId, b.id)}
             onGoHit={goHit}
+            highlights={highlights}
+            partnerHighlights={partnerHls}
+            onGoHighlight={goHighlight}
+            onEraseHighlight={(h) => eraseHighlight(h.id)}
             onClose={() => setPanel(null)}
           />
         )}
@@ -633,6 +837,33 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {tool === 'highlight' && !popover && (
+          <motion.div key="hint" className="hl-hint" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
+            <span className={`hl-hint__ink hl--${prefs.highlightColor ?? 'honey'}`} />
+            Drag across words to highlight · tap one to change or erase it
+            <button onClick={() => setTool('turn')}>Done</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {popover && (
+        <HighlightPopover
+          key={popover.kind === 'mine' ? popover.id : popover.h.id}
+          target={popover}
+          highlight={popover.kind === 'mine' ? highlights.find((h) => h.id === popover.id) : undefined}
+          canShare={!!book.shared}
+          partner={partner}
+          onChange={(patch) => {
+            if (popover.kind !== 'mine') return;
+            if (patch.color) updatePrefs({ highlightColor: patch.color });
+            void updateHighlight(popover.id, patch);
+          }}
+          onErase={() => popover.kind === 'mine' && eraseHighlight(popover.id)}
+          onClose={() => setPopover(null)}
+        />
+      )}
 
       <AnimatePresence>
         {celebrate && user && (

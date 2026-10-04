@@ -322,7 +322,12 @@ const DEMO: DemoBook[] = [
 
 function chapterHtml(ch: DemoChapter, i: number): string {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const paras = ch.paras.map((p, j) => `<p${j === 0 ? ' class="first"' : ''}>${esc(p)}</p>`).join('');
+  const leadIn = (p: string) => {
+    // The first five words get small caps, like a printed chapter opening.
+    const m = p.match(/^((?:\S+\s+){1,5})/);
+    return m ? `<span class="lead-in">${esc(m[1])}</span>${esc(p.slice(m[1].length))}` : esc(p);
+  };
+  const paras = ch.paras.map((p, j) => (j === 0 ? `<p class="first">${leadIn(p)}</p>` : `<p>${esc(p)}</p>`)).join('');
   return `<header class="chapter-head"><span class="chapter-num">Chapter ${NUMBERS[i] ?? i + 1}</span><h2>${esc(ch.title)}</h2><div class="ornament" aria-hidden="true">❦</div></header>${paras}`;
 }
 

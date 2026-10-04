@@ -2,6 +2,7 @@ import { AnimatePresence, motion, PresenceContext } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AmbientControl } from '../components/AmbientPanel';
 import { Dust } from '../components/Atmosphere';
+import { DiaryCandles } from '../components/Diary';
 import { Avatar } from '../components/Avatar';
 import { AddBook, BookDetail, EditBook } from '../components/BookDialogs';
 import { Cover } from '../components/Cover';
@@ -300,6 +301,9 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4, duration: 0.8 }}>
                 {moodLine()}
               </motion.p>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7, duration: 0.8 }}>
+                <DiaryCandles diary={prefs.diary} />
+              </motion.div>
             </section>
 
             {hero && heroState ? (

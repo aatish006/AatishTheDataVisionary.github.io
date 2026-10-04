@@ -74,6 +74,33 @@ export interface Bookmark {
 
 export type ShelfStatus = 'none' | 'want' | 'reading' | 'finished';
 
+export type HighlightColor = 'honey' | 'rose' | 'sage' | 'lavender';
+export const HIGHLIGHT_COLORS: HighlightColor[] = ['honey', 'rose', 'sage', 'lavender'];
+
+/**
+ * A highlighted passage. Positions are character offsets into the section's
+ * text, so they survive font/size changes and are identical on every device.
+ */
+export interface Highlight {
+  id: string;
+  section: number;
+  start: number;
+  end: number;
+  text: string;
+  color: HighlightColor;
+  note?: string;
+  /** on Our Shelf books: visible to the other reader as a note left for them */
+  shared?: boolean;
+  createdAt: number;
+  updatedAt?: number;
+}
+
+/** A shared highlight left by the other reader. */
+export interface PartnerHighlight extends Highlight {
+  bookId: string;
+  author: UserId;
+}
+
 /** Per-user, per-book state. Keyed `${userId}:${bookId}` — never shared between readers. */
 export interface UserBookState {
   key: string;
@@ -87,6 +114,7 @@ export interface UserBookState {
   /** human label of last position, e.g. "Chapter 7" */
   positionLabel?: string;
   bookmarks: Bookmark[];
+  highlights?: Highlight[];
   lastOpenedAt?: number;
   finishedAt?: number;
   /** last change, ms — newest wins when devices sync */
@@ -113,6 +141,9 @@ export interface UserPrefs {
   ambient: AmbientId;
   ambientVolume: number;
   showDemo: boolean;
+  highlightColor?: HighlightColor;
+  /** reading diary: minutes read per day, 'YYYY-MM-DD' → minutes */
+  diary?: Record<string, number>;
   /** last change, ms — newest wins when devices sync */
   updatedAt?: number;
 }
