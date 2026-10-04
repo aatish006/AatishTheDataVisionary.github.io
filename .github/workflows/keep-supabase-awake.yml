@@ -1,0 +1,64 @@
+# Keeps the library's Supabase project from pausing.
+#
+# Supabase's free plan pauses a project after ~7 days without activity.
+# Every two days this job makes one tiny read from the database, using the
+# public URL and anon key already published in docs/library/config.json
+# (no secrets needed). Until cloud sync is configured it does nothing.
+#
+# GitHub also switches off scheduled jobs in repositories that see no commits
+# for 60 days, so if the repo has been quiet for 45 days the job records a
+# heartbeat commit in .github/keepalive to keep itself running.
+
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: '17 6 */2 * *' # every two days at 06:17 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Visit the database
+        run: |
+          URL=$(jq -r '.supabaseUrl // ""' docs/library/config.json | sed 's:/*$::')
+          KEY=$(jq -r '.supabaseAnonKey // ""' docs/library/config.json)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "Cloud sync isn't configured yet — nothing to keep awake."
+            exit 0
+          fi
+          # A read the row-level security rules allow (it returns nothing without a
+          # signed-in user, but it still counts as activity on the project).
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              "$URL/rest/v1/books?select=id&limit=1")
+            echo "Supabase answered HTTP $code"
+            if [ "$code" -ge 200 ] && [ "$code" -lt 500 ]; then exit 0; fi
+            sleep 20
+          done
+          echo "::error::Supabase didn't respond. If the project was paused, resume it from the dashboard."
+          exit 1
+
+      - name: Keep this schedule alive
+        run: |
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          if [ $(( (now - last) / 86400 )) -ge 45 ]; then
+            date -u +%Y-%m-%dT%H:%M:%SZ > .github/keepalive
+            git config user.name "library-keepalive"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/keepalive
+            git commit -m "Keepalive: the library is still here"
+            git push
+          else
+            echo "Repository active recently; no heartbeat needed."
+          fi
