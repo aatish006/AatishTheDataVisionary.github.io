@@ -408,6 +408,17 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
                   <button className="btn btn--gold" onClick={() => setAdding({ file: null })}>
                     <Icon name="plus" size={18} /> Add your first book
                   </button>
+                  <p className="empty__hint">
+                    Books {userName(partner)} adds stay on {partner === 'nishi' ? 'her' : 'his'} shelf. Once they’re shared, they appear on Our Shelf below.
+                    {!prefs.showDemo && (
+                      <>
+                        {' '}
+                        <button className="link-btn empty__demo" onClick={() => lib.updatePrefs({ showDemo: true })}>
+                          Show the demo books again
+                        </button>
+                      </>
+                    )}
+                  </p>
                 </div>
               ) : shelfBooks.length ? (
                 <Bookshelf seed={filter.length}>{renderBooks(shelfBooks)}</Bookshelf>
