@@ -10,9 +10,9 @@
 // state / per preferences record.
 
 import { repository as repo } from '../repository';
-import type { Book, UserBookState, UserId, UserPrefs } from '../types';
+import { partnerOf, type Book, type PartnerHighlight, type UserBookState, type UserId, type UserPrefs } from '../types';
 import { mockRemote, mockSession } from './mock';
-import type { Remote } from './remote';
+import type { Remote, SharedHighlightRow } from './remote';
 import { supabaseRemote, supabaseSignIn, supabaseSignOut, supabaseUserId, type SupabaseConfig } from './supabase';
 
 export type CloudMode = 'local' | 'supabase' | 'mock';
@@ -91,6 +91,23 @@ export async function activate(profile: UserId): Promise<boolean> {
   return !!active;
 }
 
+// ------------------------------------------------------------------ notes for each other
+
+/**
+ * Highlights the other reader shared on Our Shelf books.
+ * On one device without cloud sync we can read their state directly;
+ * with sync they arrive through the shared_highlights table.
+ */
+export async function partnerHighlights(me: UserId, bookId: string): Promise<PartnerHighlight[]> {
+  const other = partnerOf(me);
+  if (mode === 'local') {
+    const st = await repo.getState(other, bookId);
+    return (st.highlights ?? []).filter((h) => h.shared).map((h) => ({ ...h, bookId, author: other }));
+  }
+  const all = (await repo.getMeta<PartnerHighlight[]>(`partner-highlights:${me}`)) ?? [];
+  return all.filter((h) => h.bookId === bookId);
+}
+
 // ------------------------------------------------------------------ tombstones
 
 interface Tombstone {
@@ -100,7 +117,7 @@ interface Tombstone {
 }
 
 export async function recordDeletion(book: Book) {
-  if (!cloudEnabled() || book.isDemo) return;
+  if (!cloudEnabled()) return;
   const list = (await repo.getMeta<Tombstone[]>('tombstones')) ?? [];
   list.push({ id: book.id, at: Date.now(), paths: [book.remoteFile, book.remoteCover].filter(Boolean) as string[] });
   await repo.setMeta('tombstones', list);
@@ -201,7 +218,8 @@ async function syncOnce(remote: Remote): Promise<boolean> {
   }
   const pushBooks = [];
   for (let lb of await repo.listBooks()) {
-    if (lb.ownerId !== me || lb.isDemo) continue;
+    // Demo books sync their details too (they have no file), so sharing them works across devices.
+    if (lb.ownerId !== me) continue;
     // First time this book reaches the cloud: upload its file and cover.
     if (!lb.remoteFile && lb.fileKey) {
       const blob = await repo.getBlob(lb.fileKey);
@@ -248,6 +266,33 @@ async function syncOnce(remote: Remote): Promise<boolean> {
     changed = true;
   } else if (stamp(lp) > 0 && (!rp || stamp(lp) > stamp(rp))) {
     await remote.pushPrefs(lp);
+  }
+
+  // ---- highlights shared on Our Shelf (notes for each other)
+  const sharedRows = await remote.pullSharedHighlights();
+  const mineRemote = new Map(sharedRows.filter((r) => r.author === me).map((r) => [r.id, r]));
+  const books = new Map((await repo.listBooks()).map((b) => [b.id, b]));
+  const wanted = new Map<string, SharedHighlightRow>();
+  for (const st of await repo.listStates(me)) {
+    if (!books.get(st.bookId)?.shared) continue;
+    for (const h of st.highlights ?? []) {
+      if (!h.shared) continue;
+      const at = h.updatedAt ?? h.createdAt;
+      wanted.set(h.id, { id: h.id, book_id: st.bookId, author: me, data: { ...h, bookId: st.bookId, author: me }, deleted: false, updated_at: at });
+    }
+  }
+  const pushHl: SharedHighlightRow[] = [];
+  for (const [id, row] of wanted) {
+    const r = mineRemote.get(id);
+    if (!r || r.deleted || r.updated_at < row.updated_at) pushHl.push(row);
+  }
+  for (const [id, r] of mineRemote) if (!r.deleted && !wanted.has(id)) pushHl.push({ ...r, deleted: true, updated_at: Date.now() });
+  await remote.pushSharedHighlights(pushHl);
+  const theirs = sharedRows.filter((r) => r.author !== me && !r.deleted).map((r) => r.data);
+  const key = `partner-highlights:${me}`;
+  if (JSON.stringify((await repo.getMeta(key)) ?? []) !== JSON.stringify(theirs)) {
+    await repo.setMeta(key, theirs);
+    changed = true;
   }
 
   return changed;

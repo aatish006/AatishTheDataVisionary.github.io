@@ -57,9 +57,16 @@ src/
 
 - **Sync.** See *Cloud sync* below.
 
+## Highlights, notes and other cozy things
+
+- **Highlighter.** Tap the pen at the top of a page, then drag across words, on a finger or a mouse. Choose honey, rose, sage or lavender. Tap any highlight to change its colour, add a note, or **erase** it. Highlights are stored as character positions in the chapter, not page numbers, so they stay put when you change the font or size, and they look the same on every device. With cloud sync on, they're saved permanently in your account. Every highlight and note is listed under **Contents → Notes**; tap one to jump there. (EPUBs and demo books only: PDF pages are images, so there's no text to highlight.)
+- **Notes for each other.** On a book from *Our Shelf*, tap the ♥ on a highlight to leave it for the other person. It appears in their copy as a soft underline in your colour; when they tap it, they see your avatar and note: *"Aatish left this for you."* Shared notes sync through their own table, `shared_highlights`.
+- **A week of candles.** The library shows the last seven days as little candles, lit for each day you read, with taller flames for longer evenings, plus today's minutes and your streak. Only time with the page open and turning counts. The diary syncs with your settings.
+- **Fall-asleep timer.** In the ambient sound panel, **Fade out: 15 / 30 / 60 min** fades the rain (or fire, or ocean) out gently, so it doesn't play all night.
+
 ## Cloud sync (your library on every device)
 
-With cloud sync on, every book you upload, and every reader's progress, bookmarks, shelves and reading settings, follows you to any phone, tablet or laptop you sign in on.
+With cloud sync on, every book you upload, and every reader's progress, bookmarks, highlights and notes, shelves, reading diary and settings, follows you to any phone, tablet or laptop you sign in on.
 
 **How it works.** Each device keeps a full local copy, so the library opens instantly and works offline. Every change is stamped with the time it was made. The app syncs with the cloud when it opens, when you come back to it, when you go back online, every minute while open, and a moment after each change (page turns included). The newest change wins. Book files are uploaded once to a private bucket. Another device downloads a file the first time you open that book, then keeps it.
 
@@ -132,7 +139,7 @@ library-app/public/audio/
 ## Ideas for the next version
 
 1. Live updates while both devices are open (Supabase Realtime) instead of a once-a-minute sync.
-2. Highlights and margin notes, and optionally *see Nishi's highlight here*-style sharing on Our Shelf.
+2. Quote cards: turn a highlight into a pretty image to send each other.
 3. A "reading together" nudge: when both of you are in the same shared book, a small shared progress ribbon.
 4. A yearly reading calendar or "memories" shelf with dates finished and favourite quotes.
 5. Offline install as a PWA (service worker plus an app icon on the home screen).

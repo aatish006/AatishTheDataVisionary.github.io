@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { canHaptic } from '../lib/haptics';
 import type { ReaderDocument, TocEntry } from '../lib/importers/types';
-import type { Bookmark, ReaderFont, ReaderTheme, UserPrefs } from '../lib/types';
+import { userName, type Bookmark, type Highlight, type PartnerHighlight, type ReaderFont, type ReaderTheme, type UserPrefs } from '../lib/types';
+import { Avatar } from '../components/Avatar';
 import { FONT_LABEL, FONT_STACK } from './layout';
 import { searchFlow, type SearchHit } from './paginate';
 
@@ -155,7 +156,7 @@ export function SettingsPanel({ prefs, update, fixed, onClose }: { prefs: UserPr
 
 // ---------------------------------------------------------------- contents / bookmarks / search
 
-type Tab = 'contents' | 'bookmarks' | 'search';
+type Tab = 'contents' | 'bookmarks' | 'highlights' | 'search';
 
 export function ContentsPanel(props: {
   doc: ReaderDocument;
@@ -165,6 +166,10 @@ export function ContentsPanel(props: {
   onGoBookmark(b: Bookmark): void;
   onRemoveBookmark(b: Bookmark): void;
   onGoHit(hit: SearchHit, query: string): void;
+  highlights: Highlight[];
+  partnerHighlights: PartnerHighlight[];
+  onGoHighlight(h: Highlight): void;
+  onEraseHighlight(h: Highlight): void;
   onClose(): void;
   initialTab?: Tab;
 }) {
@@ -189,9 +194,9 @@ export function ContentsPanel(props: {
     <motion.aside className="rpanel rpanel--contents" role="dialog" aria-label="Contents" {...panelMotion} onPointerDown={(e) => e.stopPropagation()}>
       <header className="rpanel__head">
         <div className="tabs" role="tablist">
-          {(['contents', 'bookmarks', ...(doc.kind === 'flow' ? ['search'] : [])] as Tab[]).map((t) => (
+          {(['contents', 'bookmarks', ...(doc.kind === 'flow' ? ['highlights', 'search'] : [])] as Tab[]).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'is-on' : ''} onClick={() => setTab(t)}>
-              {t === 'contents' ? 'Contents' : t === 'bookmarks' ? `Bookmarks${props.bookmarks.length ? ` · ${props.bookmarks.length}` : ''}` : 'Search'}
+              {t === 'contents' ? 'Contents' : t === 'bookmarks' ? 'Ribbons' : t === 'highlights' ? 'Notes' : 'Search'}
             </button>
           ))}
         </div>
@@ -237,6 +242,37 @@ export function ContentsPanel(props: {
               </button>
             </li>
           ))}
+        </ul>
+      )}
+
+      {tab === 'highlights' && (
+        <ul className="hlist">
+          {props.highlights.length === 0 && props.partnerHighlights.length === 0 && (
+            <li className="empty-note">
+              <span className="hlist__demo hl--honey">Nothing highlighted yet.</span>
+              Pick up the highlighter at the top of the page and drag across the words you love.
+            </li>
+          )}
+          {[...props.partnerHighlights.map((h) => ({ h, theirs: true })), ...props.highlights.map((h) => ({ h, theirs: false }))]
+            .sort((a, b) => a.h.section - b.h.section || a.h.start - b.h.start)
+            .map(({ h, theirs }) => (
+              <li key={h.id} className={theirs ? 'is-theirs' : ''}>
+                <button className="hlist__go" onClick={() => props.onGoHighlight(h)}>
+                  <span className="hlist__where">
+                    {theirs && <Avatar user={(h as PartnerHighlight).author} size={18} />}
+                    {theirs ? `From ${userName((h as PartnerHighlight).author)} · ` : h.shared ? '❤︎ Shared · ' : ''}
+                    {doc.kind === 'flow' ? doc.sections[h.section]?.title ?? `Part ${h.section + 1}` : ''}
+                  </span>
+                  <span className={`hlist__text hl--${h.color}`}>{h.text.length > 220 ? h.text.slice(0, 220) + '…' : h.text}</span>
+                  {h.note && <span className="hlist__note">{h.note}</span>}
+                </button>
+                {!theirs && (
+                  <button className="icon-btn icon-btn--small" onClick={() => props.onEraseHighlight(h)} aria-label="Erase highlight" title="Erase">
+                    <Icon name="eraser" size={16} />
+                  </button>
+                )}
+              </li>
+            ))}
         </ul>
       )}
 

@@ -85,3 +85,22 @@ create policy "files: read own or shared" on storage.objects for select to authe
       )
     )
   );
+
+-- Highlights shared on Our Shelf books: little notes left for each other.
+create table if not exists public.shared_highlights (
+  id text primary key,
+  book_id text not null,
+  author_id uuid not null default auth.uid() references auth.users on delete cascade,
+  author text not null check (author in ('aatish', 'nishi')),
+  data jsonb not null,
+  deleted boolean not null default false,
+  updated_at bigint not null
+);
+alter table public.shared_highlights enable row level security;
+drop policy if exists "shared highlights: read own or on shared books" on public.shared_highlights;
+drop policy if exists "shared highlights: write own" on public.shared_highlights;
+drop policy if exists "shared highlights: update own" on public.shared_highlights;
+create policy "shared highlights: read own or on shared books" on public.shared_highlights for select to authenticated
+  using (author_id = auth.uid() or exists (select 1 from public.books b where b.id = book_id and b.shared and not b.deleted));
+create policy "shared highlights: write own" on public.shared_highlights for insert to authenticated with check (author_id = auth.uid());
+create policy "shared highlights: update own" on public.shared_highlights for update to authenticated using (author_id = auth.uid()) with check (author_id = auth.uid());

@@ -22,12 +22,31 @@ export function useAmbientPlaying() {
   );
 }
 
+function useSleepAt() {
+  return useSyncExternalStore(
+    (cb) => ambientPlayer.subscribe(cb),
+    () => ambientPlayer.sleepAt,
+  );
+}
+
+const SLEEP_OPTIONS = [15, 30, 60];
+
 /** The floating "sound" button with its little panel. */
 export function AmbientControl({ placement = 'floating', className = '' }: { placement?: 'floating' | 'inline'; className?: string }) {
   const { prefs, updatePrefs } = useLibrary();
   const playing = useAmbientPlaying();
   const [open, setOpen] = useState(false);
+  const sleepAt = useSleepAt();
+  const [, tick] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const sleepLeft = sleepAt ? Math.max(1, Math.round((sleepAt - Date.now()) / 60000)) : null;
+
+  // Refresh the "fading out in …" countdown while the panel is open.
+  useEffect(() => {
+    if (!open || !sleepAt) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 20000);
+    return () => window.clearInterval(id);
+  }, [open, sleepAt]);
 
   useEffect(() => {
     ambientPlayer.setVolume(prefs.ambientVolume);
@@ -82,7 +101,11 @@ export function AmbientControl({ placement = 'floating', className = '' }: { pla
             <div className="ambient__head">
               <div>
                 <div className="ambient__title">Ambience</div>
-                <div className="ambient__sub">{playing ? `${AMBIENTS.find((a) => a.id === playing)?.label} · playing softly` : 'Quiet for now'}</div>
+                <div className="ambient__sub">
+                  {playing
+                    ? `${AMBIENTS.find((a) => a.id === playing)?.label} · ${sleepLeft ? `fading out in ${sleepLeft} min` : 'playing softly'}`
+                    : 'Quiet for now'}
+                </div>
               </div>
               <button className="ambient__play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
                 <Icon name={playing ? 'pause' : 'play'} size={18} filled={!playing} />
@@ -103,6 +126,30 @@ export function AmbientControl({ placement = 'floating', className = '' }: { pla
                   <span className="ambient__hint">{a.hint}</span>
                 </button>
               ))}
+            </div>
+            <div className="ambient__sleep" role="group" aria-label="Sleep timer">
+              <span className="ambient__sleep-label">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+                  <path d="M20 14A8 8 0 1 1 10 4a6.5 6.5 0 0 0 10 10z" />
+                </svg>
+                Fade out
+              </span>
+              {[null, ...SLEEP_OPTIONS].map((m) => {
+                const on = (sleepAt ? ambientPlayer.sleepMinutes : null) === m;
+                return (
+                  <button
+                    key={m ?? 'off'}
+                    className={`ambient__chip${on ? ' is-on' : ''}`}
+                    onClick={() => {
+                      ambientPlayer.setSleep(m);
+                      if (m && !playing) void ambientPlayer.play(prefs.ambient);
+                    }}
+                    aria-pressed={on}
+                  >
+                    {m === null ? 'Off' : `${m}m`}
+                  </button>
+                );
+              })}
             </div>
             <label className="ambient__vol">
               <Icon name="volume" size={16} />

@@ -3,7 +3,7 @@
 // by wiping IndexedDB while this shared store survives.
 
 import type { UserBookState, UserId, UserPrefs } from '../types';
-import type { Remote, RemoteBook } from './remote';
+import type { Remote, RemoteBook, SharedHighlightRow } from './remote';
 
 const KEY = 'oll-mock-cloud';
 
@@ -13,6 +13,7 @@ interface Store {
   prefs: Record<string, UserPrefs>;
   files: Record<string, string>;
   sessions: UserId[];
+  highlights?: Record<string, SharedHighlightRow>;
 }
 
 const load = (): Store => {
@@ -72,6 +73,16 @@ export function mockRemote(profile: UserId): Remote {
     async pushPrefs(p) {
       const s = load();
       s.prefs[profile] = p;
+      save(s);
+    },
+    async pullSharedHighlights() {
+      const s = load();
+      return Object.values(s.highlights ?? {}).filter((h) => h.author === profile || s.books[h.book_id]?.shared);
+    },
+    async pushSharedHighlights(rows) {
+      const s = load();
+      s.highlights ??= {};
+      for (const r of rows) s.highlights[r.id] = r;
       save(s);
     },
     async upload(name, blob) {

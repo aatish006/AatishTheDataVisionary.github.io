@@ -31,13 +31,14 @@ function Frame({ side, layout, head, folio, children, className = '' }: Common &
 }
 
 /** One page of reflowable text: the section's HTML, shifted to its column. */
-export const FlowPage = memo(function FlowPage(props: Common & { html: string; index: number; chapterStart: boolean }) {
+export const FlowPage = memo(function FlowPage(props: Common & { html: string; index: number; section: number; chapterStart: boolean }) {
   const { layout, html, index } = props;
   return (
     <Frame {...props} head={props.chapterStart ? undefined : props.head} className={props.chapterStart ? 'is-chapter-start' : ''}>
       <div className="page__body" style={{ top: layout.padT, left: layout.padL, width: layout.cw, height: layout.ch }}>
         <div
           className="flow"
+          data-section={props.section}
           style={{
             width: layout.cw,
             height: layout.ch,
