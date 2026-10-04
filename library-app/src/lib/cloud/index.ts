@@ -147,6 +147,8 @@ export async function fetchBlob(key: string, remotePath?: string): Promise<Blob 
 // ------------------------------------------------------------------ sync
 
 let running: Promise<boolean> | null = null;
+/** non-fatal issues from the last sync (e.g. a book that wouldn't upload) */
+let problems: string[] = [];
 let again = false;
 let timer = 0;
 
@@ -171,11 +173,12 @@ export function sync(): Promise<boolean> {
         again = false;
         changed = (await syncOnce(active!)) || changed;
       } while (again && active);
-      setStatus({ state: 'synced', lastSynced: Date.now() });
+      setStatus(problems.length ? { state: 'error', lastSynced: Date.now(), message: problems.join(' · ') } : { state: 'synced', lastSynced: Date.now() });
       if (changed) changeListeners.forEach((l) => l());
     } catch (e) {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-      setStatus({ ...status, state: offline ? 'offline' : 'error', message: (e as Error).message });
+      console.error('Library sync failed:', e);
+      setStatus({ ...status, state: offline ? 'offline' : 'error', message: describe(e) });
     } finally {
       running = null;
     }
@@ -186,9 +189,18 @@ export function sync(): Promise<boolean> {
 
 const stamp = (x: { updatedAt?: number }) => x.updatedAt ?? 0;
 
+/** A readable explanation for sync errors, including Supabase's own message. */
+function describe(e: unknown): string {
+  const msg = e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : String(e);
+  if (/relation .* does not exist|schema cache/i.test(msg)) return `The cloud tables are missing — run supabase/setup.sql again. (${msg})`;
+  if (/JWT|session|not authenticated|401/i.test(msg)) return `Your sign-in expired — sign out and in again. (${msg})`;
+  return msg || 'Unknown error';
+}
+
 async function syncOnce(remote: Remote): Promise<boolean> {
   const me = remote.profile;
   let changed = false;
+  problems = [];
   if (status.state !== 'synced') setStatus({ ...status, state: 'syncing' });
 
   // ---- deletions made on this device
@@ -221,17 +233,22 @@ async function syncOnce(remote: Remote): Promise<boolean> {
     // Demo books sync their details too (they have no file), so sharing them works across devices.
     if (lb.ownerId !== me) continue;
     // First time this book reaches the cloud: upload its file and cover.
+    // One stubborn file must not hold back everything else, so failures are collected and reported.
     if (!lb.remoteFile && lb.fileKey) {
       const blob = await repo.getBlob(lb.fileKey);
-      if (blob) {
+      if (!blob) continue;
+      try {
         const remoteFile = await remote.upload(`${lb.id}/book.${lb.format === 'pdf' ? 'pdf' : extOf(blob, lb.format)}`, blob);
         let remoteCover = lb.remoteCover;
         if (lb.cover.kind === 'image' && !remoteCover) {
           const cover = await repo.getBlob(lb.cover.blobKey);
-          if (cover) remoteCover = await remote.upload(`${lb.id}/cover.${extOf(cover, 'jpg')}`, cover);
+          if (cover) remoteCover = await remote.upload(`${lb.id}/cover.${extOf(cover, 'jpg')}`, cover).catch(() => undefined);
         }
         lb = { ...lb, remoteFile, remoteCover, updatedAt: Math.max(Date.now(), stamp(lb) + 1) };
         await repo.saveBook(lb);
+      } catch (e) {
+        problems.push(`“${lb.title}” couldn’t be uploaded: ${(e as Error).message}`);
+        continue; // other devices only learn about it once its file is safely in the cloud
       }
     }
     const rb = remoteById.get(lb.id);

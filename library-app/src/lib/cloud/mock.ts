@@ -86,6 +86,8 @@ export function mockRemote(profile: UserId): Remote {
       save(s);
     },
     async upload(name, blob) {
+      // Tests can simulate a failing upload.
+      if (localStorage.getItem('oll-mock-fail-upload')) throw new Error('new row violates row-level security policy');
       const s = load();
       const path = `${profile}/${name}`;
       s.files[path] = await toDataUrl(blob);
