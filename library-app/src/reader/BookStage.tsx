@@ -43,6 +43,10 @@ interface Props {
   renderPaper(): ReactNode;
   onTurned(next: number, dir: 1 | -1): void;
   onTurnStart?(dir: 1 | -1): void;
+  /** a finger/mouse drag let go and the page will finish turning (inside the pointerup, so haptics are allowed) */
+  onDragCommit?(): void;
+  /** the stage was clicked/tapped (fires after onTap; a reliable place for iOS haptics) */
+  onStageClick?(): void;
   onTap?(zone: 'prev' | 'center' | 'next', target: EventTarget | null): void;
   reducedMotion?: boolean;
   /** extra overlay content (ribbon, spine) rendered above pages */
@@ -369,6 +373,7 @@ export const BookStage = forwardRef<StageHandle, Props>(function BookStage(props
       let commit: boolean;
       if (f.dir === 1) commit = travelled > 0.3 || vx < -0.45;
       else commit = travelled < 0.7 || vx > 0.45;
+      if (commit) propsRef.current.onDragCommit?.();
       const target = (f.dir === 1) === commit ? { x: -W, y: f.cornerY } : { x: W, y: f.cornerY };
       const dist = Math.abs(target.x - P.x) / (2 * W);
       run(f, { t0: 0, t1: 1, dur: 160 + 380 * dist, path: false, from: P, to: target, committed: commit });
@@ -419,6 +424,7 @@ export const BookStage = forwardRef<StageHandle, Props>(function BookStage(props
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onClick={() => propsRef.current.onStageClick?.()}
     >
       {entries.map(([key, { v, role }]) => {
         const side: PageSide = !spread ? 'single' : role === 'left' || role === 'back' ? 'left' : 'right';

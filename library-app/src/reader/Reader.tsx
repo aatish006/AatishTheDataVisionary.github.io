@@ -319,12 +319,19 @@ export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): voi
     (dir: 1 | -1) => {
       lastActivity.current = Date.now();
       if (prefs.pageSound) void playPageTurn(dir);
-      if (prefs.haptics) hapticTick();
       if (geo.phone) setUi(false);
     },
     [prefs.pageSound, prefs.haptics, geo.phone],
   );
   const turn = useCallback((dir: 1 | -1) => stage.current?.turn(dir), []);
+  const tapTurned = useRef(false);
+  const onStageClick = useCallback(() => {
+    if (tapTurned.current && prefs.haptics) hapticTick();
+    tapTurned.current = false;
+  }, [prefs.haptics]);
+  const onDragCommit = useCallback(() => {
+    if (prefs.haptics) hapticTick();
+  }, [prefs.haptics]);
 
   const followLink = useCallback(
     async (target: string) => {
@@ -356,6 +363,7 @@ export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): voi
         setUi((u) => !u);
         return;
       }
+      tapTurned.current = true; // the haptic plays in the click that follows (iOS only allows it there)
       turn(zone === 'next' ? 1 : -1);
     },
     [panel, turn, followLink],
@@ -689,6 +697,8 @@ export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): voi
                 reducedMotion={reduced}
                 tool={tool}
                 toolHandlers={toolHandlers}
+                onStageClick={onStageClick}
+                onDragCommit={onDragCommit}
               >
                 {spread && <div className="stage__spine" aria-hidden />}
                 {draft.map((r, i) => (
