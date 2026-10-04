@@ -32,8 +32,8 @@ export function clientFor(cfg: SupabaseConfig, profile: UserId) {
   return clients.get(profile)!;
 }
 
-function check<T>(res: { data: T; error: { message: string } | null }): T {
-  if (res.error) throw new Error(res.error.message);
+function check<T>(res: { data: T; error: { message: string; details?: string; hint?: string } | null }): T {
+  if (res.error) throw new Error([res.error.message, res.error.details, res.error.hint].filter(Boolean).join(' — '));
   return res.data;
 }
 

@@ -1272,3 +1272,31 @@
   font-size: 13px;
   color: var(--cream-dim);
 }
+
+.menu__err {
+  display: block;
+  margin-top: 6px;
+  font-style: normal;
+  color: #e3a98a;
+  word-break: break-word;
+}
+.sync-toast {
+  position: fixed;
+  top: max(70px, calc(env(safe-area-inset-top) + 62px));
+  right: 16px;
+  z-index: 70;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(24, 16, 11, 0.94);
+  border: 1px solid rgba(167, 196, 150, 0.35);
+  color: var(--cream);
+  font-size: 13.5px;
+  line-height: 1.45;
+  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.7);
+  word-break: break-word;
+}
+.sync-toast.is-error {
+  border-color: rgba(227, 169, 138, 0.5);
+  color: #f1cdb8;
+}

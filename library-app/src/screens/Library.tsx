@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AmbientControl } from '../components/AmbientPanel';
 import { Dust } from '../components/Atmosphere';
 import { DiaryCandles } from '../components/Diary';
+import { cloudStatus } from '../lib/cloud';
 import { Avatar } from '../components/Avatar';
 import { AddBook, BookDetail, EditBook } from '../components/BookDialogs';
 import { Cover } from '../components/Cover';
@@ -74,6 +75,12 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
   const [scrolled, setScrolled] = useState(false);
   const [avatarMood, setAvatarMood] = useState<'wave' | 'idle'>('wave');
   const searchRef = useRef<HTMLInputElement>(null);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!syncToast || syncToast === 'Syncing…') return;
+    const id = setTimeout(() => setSyncToast(null), syncToast.length > 40 ? 9000 : 2500);
+    return () => clearTimeout(id);
+  }, [syncToast]);
 
   useEffect(() => {
     const id = setTimeout(() => setAvatarMood('idle'), 2200);
@@ -222,7 +229,18 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
             <span>Add Book</span>
           </button>
           {lib.cloudMode !== 'local' && (
-            <button className={`sync-dot sync-dot--${lib.syncStatus.state}`} onClick={() => void lib.syncNow()} title={syncLabel(lib.syncStatus)} aria-label={`${syncLabel(lib.syncStatus)}. Sync now`}>
+            <button
+              className={`sync-dot sync-dot--${lib.syncStatus.state}`}
+              onClick={async () => {
+                // Say plainly how it went (and why, if it didn't).
+                setSyncToast('Syncing…');
+                await lib.syncNow();
+                const s = cloudStatus();
+                setSyncToast(s.state === 'synced' ? 'All synced ✓' : s.message ?? syncLabel(s));
+              }}
+              title={syncLabel(lib.syncStatus)}
+              aria-label={`${syncLabel(lib.syncStatus)}. Sync now`}
+            >
               <Icon name="cloud" size={19} />
             </button>
           )}
@@ -266,7 +284,11 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
                   <div className="menu__note">
                     {lib.cloudMode !== 'local' ? (
                       <>
-                        <Icon name="cloud" size={14} /> {syncLabel(lib.syncStatus)}. Your books and progress follow you to every device.
+                        <Icon name="cloud" size={14} />
+                        <span>
+                          {syncLabel(lib.syncStatus)}. Your books and progress follow you to every device.
+                          {lib.syncStatus.message && lib.syncStatus.state !== 'synced' && <em className="menu__err">{lib.syncStatus.message}</em>}
+                        </span>
                       </>
                     ) : (
                       <>
@@ -439,6 +461,21 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
       </main>
 
       <AmbientControl placement="floating" />
+
+      <AnimatePresence>
+        {syncToast && (
+          <motion.div
+            className={`sync-toast${syncToast.includes('✓') || syncToast === 'Syncing…' ? '' : ' is-error'}`}
+            role="status"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            onClick={() => setSyncToast(null)}
+          >
+            {syncToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {dragOver && (
