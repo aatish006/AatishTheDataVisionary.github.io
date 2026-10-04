@@ -11,8 +11,11 @@ import type { ReaderDocument, TocEntry } from '../lib/importers/types';
 import { fetchBlob, onCloudChanges, partnerHighlights } from '../lib/cloud';
 import { partnerOf, type Bookmark, type Highlight, type PartnerHighlight, type ReadingPosition } from '../lib/types';
 import { uid } from '../lib/repository';
-import { caretAt, locateOffset, offsetOf, paintHtml, paintsFor, screenRects, snapToWords } from './highlights';
+import { caretAt, locateOffset, offsetOf, paintHtml, paintsFor, screenRects, snapToWords, textBetween } from './highlights';
 import { HighlightPopover, type PopoverTarget } from './HighlightPopover';
+import { QuoteCardDialog, type CardStyle, type QuoteInput } from './QuoteCard';
+
+const CARD_FOR: Record<string, CardStyle> = { honey: 'ivory', rose: 'rose', sage: 'sage', lavender: 'night' };
 import { useLibrary } from '../state/library';
 import { BookStage, type PageSide, type StageHandle } from './BookStage';
 import { computeGeometry, FONT_STACK, readInsets, type Insets } from './layout';
@@ -360,7 +363,7 @@ export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): voi
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (welcome || celebrate) return;
+      if (welcome || celebrate || quoteCardRef.current) return;
       const t = e.target as HTMLElement;
       if (t?.closest?.('input, textarea, select, [contenteditable]')) return;
       void unlockAudio();
@@ -415,6 +418,18 @@ export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): voi
   const [draft, setDraft] = useState<{ left: number; top: number; width: number; height: number }[]>([]);
   const partner = partnerOf(user ?? 'aatish');
   const canHighlight = doc?.kind === 'flow';
+  const [quoteCard, setQuoteCard] = useState<{ quote: QuoteInput; style: CardStyle } | null>(null);
+  const quoteCardRef = useRef(quoteCard);
+  quoteCardRef.current = quoteCard;
+  const openQuote = (h: Highlight | PartnerHighlight) => {
+    if (!book) return;
+    const author = 'author' in h ? h.author : undefined;
+    setPopover(null);
+    setQuoteCard({
+      quote: { text: h.text, note: h.note, noteAuthor: author ?? user ?? undefined, title: book.title, author: book.author },
+      style: CARD_FOR[h.color] ?? 'ivory',
+    });
+  };
 
   // Highlights the other reader left on this book (Our Shelf), refreshed whenever a sync brings news.
   useEffect(() => {
@@ -512,7 +527,7 @@ export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): voi
       if (!st || !flow) return;
       const [s, en] = draftRange(d, flow);
       if (en - s < 1) return;
-      const text = (flow.textContent ?? '').slice(s, en);
+      const text = textBetween(flow, s, en);
       const h: Highlight = { id: uid('hl_'), section: d.section, start: s, end: en, text, color: prefs.highlightColor ?? 'honey', createdAt: Date.now() };
       void saveHighlights([...highlights, h]);
       if (prefs.haptics) hapticTick();
@@ -815,6 +830,7 @@ export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): voi
             partnerHighlights={partnerHls}
             onGoHighlight={goHighlight}
             onEraseHighlight={(h) => eraseHighlight(h.id)}
+            onQuoteHighlight={openQuote}
             onClose={() => setPanel(null)}
           />
         )}
@@ -861,9 +877,15 @@ export function Reader({ bookId, onExit: exit }: { bookId: string; onExit(): voi
             void updateHighlight(popover.id, patch);
           }}
           onErase={() => popover.kind === 'mine' && eraseHighlight(popover.id)}
+          onQuote={() => {
+            const h = popover.kind === 'mine' ? highlights.find((x) => x.id === popover.id) : popover.h;
+            if (h) openQuote(h);
+          }}
           onClose={() => setPopover(null)}
         />
       )}
+
+      <AnimatePresence>{quoteCard && <QuoteCardDialog key="quote" quote={quoteCard.quote} defaultStyle={quoteCard.style} onClose={() => setQuoteCard(null)} />}</AnimatePresence>
 
       <AnimatePresence>
         {celebrate && user && (

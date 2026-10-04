@@ -24,6 +24,7 @@ export function HighlightPopover(props: {
   partner: UserId;
   onChange(patch: Partial<Highlight>): void;
   onErase(): void;
+  onQuote(): void;
   onClose(): void;
 }) {
   const { target, highlight, onClose } = props;
@@ -66,6 +67,9 @@ export function HighlightPopover(props: {
         </div>
         <blockquote className={`hlpop__quote hl--${h.color}`}>{h.text}</blockquote>
         {h.note && <p className="hlpop__note">“{h.note}”</p>}
+        <button className="link-btn hlpop__card" onClick={props.onQuote}>
+          <Icon name="quote" size={15} /> Make a quote card
+        </button>
       </motion.div>
     );
   }
@@ -107,6 +111,9 @@ export function HighlightPopover(props: {
             <Icon name="heart" size={17} filled={!!highlight.shared} />
           </button>
         )}
+        <button className="hlpop__btn" onClick={props.onQuote} aria-label="Make a quote card" title="Quote card">
+          <Icon name="quote" size={17} />
+        </button>
         <button className="hlpop__btn hlpop__btn--erase" onClick={props.onErase} aria-label="Erase highlight" title="Erase">
           <Icon name="eraser" size={17} />
         </button>
