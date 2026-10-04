@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DEMO_STATES, demoBookRecords } from '../lib/demoBooks';
 import { requestPersistentStorage } from '../lib/db';
-import { importerFor, MAX_FILE_MB } from '../lib/importers';
+import { detectImporter, MAX_FILE_MB } from '../lib/importers';
 import { repository as repo, uid } from '../lib/repository';
 import {
   blankState,
@@ -208,7 +208,7 @@ export function LibraryProvider({ user, children }: { user: UserId | null; child
       async addBook(file, onStage) {
         const u = userRef.current;
         if (!u) throw new Error('Choose a reader first.');
-        const importer = importerFor(file);
+        const importer = await detectImporter(file);
         if (!importer) throw new Error('That file type isn’t supported yet. Try an EPUB or PDF.');
         const maxMb = cloud.cloudEnabled() ? CLOUD_MAX_FILE_MB : MAX_FILE_MB;
         if (file.size > maxMb * 1024 * 1024) throw new Error(`That file is larger than ${maxMb} MB.`);

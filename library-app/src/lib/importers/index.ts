@@ -16,6 +16,19 @@ export function importerFor(file: { name: string; type: string }): BookImporter 
   return IMPORTERS.find((i) => i.extensions.some((e) => name.endsWith(e)) || i.mimeTypes.includes(file.type));
 }
 
+/** Like importerFor, but trusts the file's contents over its name (e.g. a PDF saved as .epub). */
+export async function detectImporter(file: File): Promise<BookImporter | undefined> {
+  try {
+    const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+    const text = String.fromCharCode(...head);
+    if (text.startsWith('%PDF')) return IMPORTERS.find((i) => i.format === 'pdf');
+    if (head[0] === 0x50 && head[1] === 0x4b && !file.name.toLowerCase().endsWith('.pdf')) return IMPORTERS.find((i) => i.format === 'epub');
+  } catch {
+    /* fall back to the name */
+  }
+  return importerFor(file);
+}
+
 export function importerByFormat(format: string): BookImporter | undefined {
   return IMPORTERS.find((i) => i.format === format);
 }
