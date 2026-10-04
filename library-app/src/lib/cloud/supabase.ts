@@ -107,7 +107,11 @@ export async function supabaseRemote(cfg: SupabaseConfig, profile: UserId): Prom
     },
     async upload(name, blob) {
       const path = `${uid}/${name}`;
-      check(await sb.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: blob.type || 'application/octet-stream' }));
+      // Send raw bytes, not the Blob: Safari can send an IndexedDB-backed Blob
+      // inside FormData as an empty body ("No content provided").
+      const bytes = await blob.arrayBuffer();
+      if (!bytes.byteLength) throw new Error('The copy saved on this device is empty. Remove the book and add it again.');
+      check(await sb.storage.from(BUCKET).upload(path, bytes, { upsert: true, contentType: blob.type || 'application/octet-stream' }));
       return path;
     },
     async download(path) {
