@@ -773,14 +773,20 @@
   text-align: center;
 }
 .empty .bookshelf__row {
-  margin-bottom: 26px;
+  margin-bottom: 30px;
+}
+/* a short, empty shelf; the two of you sit on it, waiting for the first book */
+.empty .bookshelf__books {
+  min-height: 112px;
 }
 .empty__pair {
+  position: absolute;
+  top: 36px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   justify-content: center;
   gap: 10px;
-  margin: -150px auto 18px;
-  position: relative;
   z-index: 1;
 }
 .empty h3 {
@@ -1299,4 +1305,17 @@
 .sync-toast.is-error {
   border-color: rgba(227, 169, 138, 0.5);
   color: #f1cdb8;
+}
+.empty__hint {
+  max-width: 420px;
+  margin: 18px auto 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--cream-dim);
+}
+.empty__demo {
+  color: var(--gold-soft);
+  text-decoration: underline;
+  padding: 0;
+  font-size: inherit;
 }
