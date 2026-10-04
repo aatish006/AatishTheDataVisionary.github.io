@@ -1,0 +1,13 @@
+{
+  "_readme": "Optional real audio files. Leave a list empty / a value null to use the built-in synthesised sound. Paths are relative to this folder. See README.md.",
+  "pageTurn": [],
+  "ambient": {
+    "rain": null,
+    "fireplace": null,
+    "cafe": null,
+    "forest": null,
+    "ocean": null,
+    "night": null,
+    "library": null
+  }
+}
