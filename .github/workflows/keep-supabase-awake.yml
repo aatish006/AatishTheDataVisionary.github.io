@@ -38,8 +38,11 @@ jobs:
           # A read the row-level security rules allow (it returns nothing without a
           # signed-in user, but it still counts as activity on the project).
           for i in 1 2 3; do
+            # New-style publishable keys (sb_publishable_…) go in the apikey header only;
+            # legacy anon keys are JWTs and are also sent as a bearer token.
+            if [ "${KEY#sb_}" != "$KEY" ]; then AUTH=(); else AUTH=(-H "Authorization: Bearer $KEY"); fi
             code=$(curl -s -o /dev/null -w '%{http_code}' \
-              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              -H "apikey: $KEY" "${AUTH[@]}" \
               "$URL/rest/v1/books?select=id&limit=1")
             echo "Supabase answered HTTP $code"
             if [ "$code" -ge 200 ] && [ "$code" -lt 500 ]; then exit 0; fi

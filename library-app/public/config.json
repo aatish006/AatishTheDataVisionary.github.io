@@ -1,5 +1,5 @@
 {
-  "_readme": "Cloud sync settings. Leave empty to keep everything on this device only. See library-app/README.md → Cloud sync.",
-  "supabaseUrl": "",
-  "supabaseAnonKey": ""
+  "_readme": "Cloud sync settings (public by design: access is controlled by row-level security). Empty values = this device only. See library-app/README.md → Cloud sync.",
+  "supabaseUrl": "https://alanaruvscvbrbkdgkbv.supabase.co",
+  "supabaseAnonKey": "sb_publishable_4d1WfkWO2426-V4STfbVYA__EaWeAu2"
 }
