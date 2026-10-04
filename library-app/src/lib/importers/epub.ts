@@ -11,13 +11,53 @@ import type { BookImporter, FlowDocument, FlowSection, ImportedMeta, TocEntry } 
 
 const MAX_SECTION_CHARS = 28000;
 
+const hex = (b: Uint8Array) => Array.from(b.slice(0, 4), (x) => x.toString(16).padStart(2, '0')).join(' ');
+const mb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+
+/**
+ * Open the EPUB's zip container. Bytes are read up front (more reliable on
+ * iOS Safari than handing JSZip a Blob). If JSZip is too strict for an
+ * unusually packed file, fflate gets a second try. When neither can open it,
+ * the message says what the file actually is, so the problem is fixable.
+ */
 async function loadZip(file: Blob): Promise<JSZipType> {
   const { default: JSZip } = await import('jszip');
+  let bytes: Uint8Array;
   try {
-    return await JSZip.loadAsync(file);
+    bytes = new Uint8Array(await file.arrayBuffer());
   } catch {
-    throw new Error('This file does not look like a valid EPUB (it could not be unzipped).');
+    throw new Error('The file couldn’t be read from your device. If it’s in iCloud Drive, open it in Files first so it downloads, then try again.');
   }
+  if (bytes.length === 0) {
+    throw new Error('The file arrived empty. Books exported from Apple Books are sometimes stored as folders: try AirDropping or emailing the .epub to yourself, then add it from Files.');
+  }
+  const head = new TextDecoder().decode(bytes.slice(0, 64)).trimStart().toLowerCase();
+  if (head.startsWith('<!doctype') || head.startsWith('<html') || head.startsWith('<?xml')) {
+    throw new Error('This is a web page saved with an .epub name, not the book itself — the download probably didn’t finish. Download it again and wait for it to complete.');
+  }
+  const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
+  if (isZip) {
+    try {
+      return await JSZip.loadAsync(bytes);
+    } catch {
+      /* try the more forgiving reader below */
+    }
+  }
+  try {
+    const { unzipSync } = await import('fflate');
+    const files = unzipSync(bytes);
+    const zip = new JSZip();
+    for (const [name, data] of Object.entries(files)) if (!name.endsWith('/')) zip.file(name, data);
+    if (Object.keys(files).length) return zip;
+  } catch {
+    /* fall through to the explanation */
+  }
+  if (head.startsWith('%pdf')) throw new Error('This file is actually a PDF with an .epub name. Rename it to end in .pdf and add it again.');
+  throw new Error(
+    isZip
+      ? `This EPUB is damaged and couldn’t be opened (${mb(bytes.length)}). Try downloading it again.`
+      : `This file isn’t an EPUB inside (${mb(bytes.length)}, starts with ${hex(bytes)}). It may be protected (DRM) or only partly downloaded.`,
+  );
 }
 
 const parser = () => new DOMParser();
