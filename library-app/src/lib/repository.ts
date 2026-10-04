@@ -1,15 +1,14 @@
-// The repository is the single seam between the UI and persistence.
-//
-// Today it is backed by IndexedDB (everything stays on this device).
-// To go multi-device, implement `LibraryRepository` against a real backend
-// (e.g. Supabase: Postgres tables with row-level security + a private Storage
-// bucket for files) and swap `repository` below. No UI code needs to change.
+// The repository is the local store: IndexedDB on this device.
+// It is always the source the UI reads from, so the library works offline and
+// opens instantly. When cloud sync is configured (see ./cloud), the sync engine
+// reconciles this store with Supabase so every device sees the same library.
 
 import { idb } from './db';
 import { blankState, defaultPrefs, type Book, type UserBookState, type UserId, type UserPrefs } from './types';
 
 export interface LibraryRepository {
   listBooks(): Promise<Book[]>;
+  getBook(id: string): Promise<Book | undefined>;
   saveBook(book: Book): Promise<void>;
   deleteBook(id: string): Promise<void>;
 
@@ -31,6 +30,9 @@ export interface LibraryRepository {
 class IndexedDbRepository implements LibraryRepository {
   listBooks() {
     return idb.getAll<Book>('books');
+  }
+  getBook(id: string) {
+    return idb.get<Book>('books', id);
   }
   saveBook(book: Book) {
     return idb.put('books', book);

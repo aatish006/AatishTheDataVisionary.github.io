@@ -2,6 +2,7 @@ import { AnimatePresence } from 'framer-motion';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Reader } from './reader/Reader';
 import { Library } from './screens/Library';
+import { SignIn } from './screens/SignIn';
 import { Welcome } from './screens/Welcome';
 import { LibraryProvider, useLibrary } from './state/library';
 import { USERS, type UserId } from './lib/types';
@@ -38,7 +39,7 @@ export function App() {
 }
 
 function Screens({ route }: { route: Route }) {
-  const { ready, userReady, error } = useLibrary();
+  const { ready, userReady, error, authNeeded } = useLibrary();
   const scrollY = useRef(0);
 
   // Return to the same spot on the shelf after closing a book.
@@ -69,12 +70,14 @@ function Screens({ route }: { route: Route }) {
     );
   }
   if (!ready) return <div className="boot" aria-label="Opening the library" />;
-  const waiting = !!route.user && !userReady;
+  const waiting = !!route.user && !userReady && !authNeeded;
 
   const key = route.bookId ? `read:${route.bookId}` : route.user ? `lib:${route.user}` : 'welcome';
   return (
     <AnimatePresence mode="wait">
-      {waiting ? null : !route.user ? (
+      {waiting ? null : route.user && authNeeded ? (
+        <SignIn key={`signin:${route.user}`} user={route.user} onBack={() => go('/')} />
+      ) : !route.user ? (
         <Welcome key={key} onChoose={(u) => go(`/${u}`)} />
       ) : route.bookId ? (
         <Reader key={key} bookId={route.bookId} onExit={closeBook} />

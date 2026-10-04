@@ -23,6 +23,23 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
 ];
 
+function syncLabel(s: { state: string; lastSynced?: number }) {
+  switch (s.state) {
+    case 'syncing':
+      return 'Syncing…';
+    case 'synced': {
+      const mins = s.lastSynced ? Math.floor((Date.now() - s.lastSynced) / 60000) : 0;
+      return mins < 1 ? 'In sync on all your devices' : `Synced ${mins} min ago`;
+    }
+    case 'offline':
+      return 'Offline — will sync when you’re back online';
+    case 'error':
+      return 'Couldn’t reach the cloud — will retry';
+    default:
+      return 'Connecting…';
+  }
+}
+
 function greeting(d = new Date()) {
   const h = d.getHours();
   if (h < 5) return 'Still awake';
@@ -203,6 +220,11 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
             <Icon name="plus" size={18} />
             <span>Add Book</span>
           </button>
+          {lib.cloudMode !== 'local' && (
+            <button className={`sync-dot sync-dot--${lib.syncStatus.state}`} onClick={() => void lib.syncNow()} title={syncLabel(lib.syncStatus)} aria-label={`${syncLabel(lib.syncStatus)}. Sync now`}>
+              <Icon name="cloud" size={19} />
+            </button>
+          )}
           <div className="profile">
             <button className="profile__btn" onClick={() => setMenu((m) => !m)} aria-label={`${userName(user)} — profile menu`} aria-expanded={menu}>
               <Avatar user={user} size={40} mood={avatarMood} />
@@ -230,8 +252,26 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
                   <button onClick={() => lib.updatePrefs({ showDemo: !prefs.showDemo })}>
                     <Icon name="sparkle" size={16} /> {prefs.showDemo ? 'Hide demo books' : 'Show demo books'}
                   </button>
+                  {lib.cloudMode !== 'local' && (
+                    <button
+                      onClick={async () => {
+                        await lib.signOut();
+                        onSwitch();
+                      }}
+                    >
+                      <Icon name="logout" size={16} /> Sign out on this device
+                    </button>
+                  )}
                   <div className="menu__note">
-                    <Icon name="lock" size={14} /> Books and progress are stored privately in this browser.
+                    {lib.cloudMode !== 'local' ? (
+                      <>
+                        <Icon name="cloud" size={14} /> {syncLabel(lib.syncStatus)}. Your books and progress follow you to every device.
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="lock" size={14} /> Books and progress are stored privately in this browser.
+                      </>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -390,7 +430,7 @@ export function Library({ user, onRead, onSwitch }: { user: UserId; onRead(id: s
         <footer className="library__foot">
           <span>Made for Aatish &amp; Nishi</span>
           <span aria-hidden>·</span>
-          <span>Everything stays on this device</span>
+          <span>{lib.cloudMode !== 'local' ? 'Private · synced across your devices' : 'Everything stays on this device'}</span>
         </footer>
       </main>
 

@@ -1,17 +1,19 @@
 import { memo, useEffect, useState } from 'react';
-import { repository } from '../lib/repository';
+import { fetchBlob } from '../lib/cloud';
 import type { Book, CoverMotif, GeneratedCover } from '../lib/types';
 
 // ---------- cover images (object URLs cached for the session) ----------
 
 const urlCache = new Map<string, Promise<string | null>>();
 
-export function coverUrl(blobKey: string) {
+export function coverUrl(blobKey: string, remotePath?: string) {
   if (!urlCache.has(blobKey)) {
-    urlCache.set(
-      blobKey,
-      repository.getBlob(blobKey).then((b) => (b ? URL.createObjectURL(b) : null)).catch(() => null),
-    );
+    const p = fetchBlob(blobKey, remotePath)
+      .then((b) => (b ? URL.createObjectURL(b) : null))
+      .catch(() => null);
+    // Don't remember a miss: the cover may arrive with the next sync.
+    p.then((u) => u || urlCache.delete(blobKey));
+    urlCache.set(blobKey, p);
   }
   return urlCache.get(blobKey)!;
 }
@@ -25,11 +27,11 @@ export function useCoverUrl(book: Book) {
       setUrl(null);
       return;
     }
-    coverUrl(key).then((u) => alive && setUrl(u));
+    coverUrl(key, book.remoteCover).then((u) => alive && setUrl(u));
     return () => {
       alive = false;
     };
-  }, [key]);
+  }, [key, book.remoteCover]);
   return url;
 }
 
