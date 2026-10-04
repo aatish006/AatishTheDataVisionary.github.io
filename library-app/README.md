@@ -88,7 +88,9 @@ With cloud sync on, every book you upload, and every reader's progress, bookmark
 
 Leave `config.json` empty and the app works exactly as before: no sign-in, this device only.
 
-**Limits (free plan).** 50 MB per book file and 1 GB of storage in total, which is plenty for EPUBs (typically 0.5–5 MB). Free projects pause after a week with no activity. Reading every week or two keeps it awake, or you can restore it with one click in the dashboard.
+**Limits (free plan).** 50 MB per book file and 1 GB of storage in total, which is plenty for EPUBs (typically 0.5–5 MB).
+
+**Never paused.** Free Supabase projects pause after about 7 days without activity. The scheduled GitHub Action [`.github/workflows/keep-supabase-awake.yml`](../.github/workflows/keep-supabase-awake.yml) makes one tiny database read every two days, using the public URL and key from `config.json`, so the project never goes idle. It also writes a heartbeat commit if the repo has been quiet for 45 days, because GitHub switches off schedules in inactive repos. You can run it by hand from the repo's **Actions** tab. If it ever fails, GitHub emails you, and a paused project can be resumed with one click without losing data. Upgrading to Supabase Pro ($25/month) removes pausing entirely.
 
 ## Adding real ebooks
 
