@@ -8,7 +8,7 @@ import { openDemoBook } from '../lib/demoBooks';
 import { hapticTick } from '../lib/haptics';
 import { importerByFormat } from '../lib/importers';
 import type { ReaderDocument, TocEntry } from '../lib/importers/types';
-import { repository } from '../lib/repository';
+import { fetchBlob } from '../lib/cloud';
 import type { Bookmark, ReadingPosition } from '../lib/types';
 import { useLibrary } from '../state/library';
 import { BookStage, type PageSide, type StageHandle } from './BookStage';
@@ -58,8 +58,12 @@ export function Reader({ bookId, onExit }: { bookId: string; onExit(): void }) {
       try {
         if (book.format === 'demo') opened = openDemoBook(book.id);
         else {
-          const blob = book.fileKey ? await repository.getBlob(book.fileKey) : undefined;
-          if (!blob) throw new Error('The file for this book is missing from this device.');
+          // Downloads from the cloud the first time this device opens the book, then it's cached.
+          const blob = book.fileKey ? await fetchBlob(book.fileKey, book.remoteFile).catch(() => undefined) : undefined;
+          if (!blob)
+            throw new Error(
+              book.remoteFile ? 'This book couldn’t be downloaded. Check your connection and try again.' : 'The file for this book is missing from this device.',
+            );
           const importer = importerByFormat(book.format);
           if (!importer) throw new Error(`No reader is available for ${book.format.toUpperCase()} files.`);
           opened = await importer.open(blob);

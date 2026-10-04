@@ -282,7 +282,11 @@ export function AddBook({ onClose, initialFile, user }: { onClose(): void; initi
         {phase.k === 'pick' && (
           <motion.div key="pick" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <h2 className="sheet__title">Add a book</h2>
-            <p className="sheet__lede">It stays private — the file is kept only in this browser, on this device.</p>
+            <p className="sheet__lede">
+              {lib.cloudMode !== 'local'
+                ? 'It stays private — kept in your own cloud library, ready on every device you sign in on.'
+                : 'It stays private — the file is kept only in this browser, on this device.'}
+            </p>
             <div
               className={`dropzone${drag ? ' is-drag' : ''}`}
               onDragOver={(e) => {
@@ -310,7 +314,7 @@ export function AddBook({ onClose, initialFile, user }: { onClose(): void; initi
                 <strong>Choose an ebook</strong> or drop it here
               </div>
               <div className="dropzone__formats">
-                {IMPORTERS.map((i) => i.label).join(' · ')} · up to {MAX_FILE_MB} MB
+                {IMPORTERS.map((i) => i.label).join(' · ')} · up to {lib.cloudMode !== 'local' ? 50 : MAX_FILE_MB} MB
               </div>
               <input
                 ref={inputRef}

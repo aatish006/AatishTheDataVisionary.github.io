@@ -49,6 +49,11 @@ export interface Book {
   isDemo?: boolean;
   /** key into the `blobs` store for the original file (epub/pdf) */
   fileKey?: string;
+  /** cloud storage paths (set once uploaded) */
+  remoteFile?: string;
+  remoteCover?: string;
+  /** last change, ms — newest wins when devices sync */
+  updatedAt?: number;
 }
 
 /** A reading position that survives re-pagination (font size, screen size…). */
@@ -84,6 +89,8 @@ export interface UserBookState {
   bookmarks: Bookmark[];
   lastOpenedAt?: number;
   finishedAt?: number;
+  /** last change, ms — newest wins when devices sync */
+  updatedAt?: number;
 }
 
 export type ReaderTheme = 'day' | 'sepia' | 'night';
@@ -106,6 +113,8 @@ export interface UserPrefs {
   ambient: AmbientId;
   ambientVolume: number;
   showDemo: boolean;
+  /** last change, ms — newest wins when devices sync */
+  updatedAt?: number;
 }
 
 export const defaultPrefs = (userId: UserId): UserPrefs => ({

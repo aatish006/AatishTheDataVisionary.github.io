@@ -225,3 +225,78 @@
     font-size: 24px;
   }
 }
+
+/* ---------------- sign-in (cloud sync) ---------------- */
+
+.signin-card {
+  width: min(400px, 100%);
+  padding: 30px 30px 22px;
+  border-radius: 20px;
+  text-align: left;
+  background: var(--grain), linear-gradient(180deg, #fbf4e4, #f1e5cb);
+  color: var(--ink);
+  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.75);
+  color-scheme: light;
+}
+.signin-card .avatar {
+  margin: -76px auto 8px;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.45));
+}
+.signin-card h1 {
+  font-size: 34px;
+  text-align: center;
+  color: var(--ink);
+  text-shadow: none;
+}
+.signin-card__lede {
+  margin: 6px 0 20px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.signin-card__error {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(140, 47, 57, 0.08);
+  color: var(--burgundy);
+  font-size: 13.5px;
+}
+.signin-card__submit {
+  width: 100%;
+  margin-top: 4px;
+}
+.signin-card__back {
+  display: flex;
+  margin: 12px auto 0;
+}
+.signin .welcome__center {
+  padding-top: 70px;
+}
+
+/* sync indicator in the library top bar */
+.sync-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--cream-faint);
+  border: 0;
+  background: none;
+}
+.sync-dot svg {
+  overflow: visible;
+}
+.sync-dot--synced {
+  color: rgba(167, 196, 150, 0.85);
+}
+.sync-dot--syncing svg {
+  animation: breathe 1.4s ease-in-out infinite;
+  color: var(--gold-soft);
+}
+.sync-dot--offline,
+.sync-dot--error {
+  color: #d9a07a;
+}

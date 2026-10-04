@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Dust, ShelfWall } from '../components/Atmosphere';
 import { Avatar, type AvatarMood } from '../components/Avatar';
 import { unlockAudio } from '../lib/audio/engine';
+import { cloudEnabled } from '../lib/cloud';
 import { USERS, type UserId } from '../lib/types';
 
 /** "Who is reading tonight?" — the doorway into the library. */
@@ -106,7 +107,7 @@ export function Welcome({ onChoose }: { onChoose(u: UserId): void }) {
       </main>
 
       <footer className="welcome__foot">
-        <span>Private · stored only on this device</span>
+        <span>{cloudEnabled() ? 'Private · your library on every device' : 'Private · stored only on this device'}</span>
       </footer>
     </motion.div>
   );
