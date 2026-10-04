@@ -3,7 +3,7 @@
 *A quiet place for our stories.* A private ebook library and reading room for Aatish and Nishi.
 
 - **Source:** `library-app/` (React, TypeScript, Vite)
-- **Built site:** `../library/`, which GitHub Pages serves at `/library/`
+- **Built site:** `../docs/library/`. GitHub Pages publishes this repo from `/docs`, so it is served at `/library/`
 
 ## Run it
 
@@ -11,11 +11,11 @@
 cd library-app
 npm install
 npm run dev        # http://localhost:5173 — hot reload
-npm run build      # typecheck + production build into ../library
+npm run build      # typecheck + production build into ../docs/library
 npm run preview    # serve the production build locally
 ```
 
-Commit the rebuilt `library/` folder to publish it on GitHub Pages. It needs no server or environment variables.
+Commit the rebuilt `docs/library/` folder to publish it on GitHub Pages. It needs no server or environment variables.
 
 ## Architecture
 
