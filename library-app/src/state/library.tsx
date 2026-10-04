@@ -217,7 +217,10 @@ export function LibraryProvider({ user, children }: { user: UserId | null; child
         onStage?.('Finding the title page…');
         const id = uid('b_');
         const fileKey = `file:${id}`;
-        await repo.putBlob(fileKey, file);
+        // Keep a plain in-memory copy of the bytes rather than the picker's File handle,
+        // which some browsers (iOS Safari) can't read back reliably later.
+        const stored = new Blob([await file.arrayBuffer()], { type: file.type || (importer.format === 'pdf' ? 'application/pdf' : 'application/epub+zip') });
+        await repo.putBlob(fileKey, stored);
         let cover: Book['cover'];
         const title = meta.title?.trim() || file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
         if (meta.cover) {
