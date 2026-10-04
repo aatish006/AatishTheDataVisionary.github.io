@@ -61,6 +61,7 @@ src/
 
 - **Highlighter.** Tap the pen at the top of a page, then drag across words, on a finger or a mouse. Choose honey, rose, sage or lavender. Tap any highlight to change its colour, add a note, or **erase** it. Highlights are stored as character positions in the chapter, not page numbers, so they stay put when you change the font or size, and they look the same on every device. With cloud sync on, they're saved permanently in your account. Every highlight and note is listed under **Contents → Notes**; tap one to jump there. (EPUBs and demo books only: PDF pages are images, so there's no text to highlight.)
 - **Notes for each other.** On a book from *Our Shelf*, tap the ♥ on a highlight to leave it for the other person. It appears in their copy as a soft underline in your colour; when they tap it, they see your avatar and note: *"Aatish left this for you."* Shared notes sync through their own table, `shared_highlights`.
+- **Quote cards.** Tap a highlight (or the “ button in **Contents → Notes**) to turn the passage into a card, set like a page from a fine book: Ivory, Night, Rose or Sage, with your note if you like. On iPhone, **Send** opens the share sheet (Messages, WhatsApp, Save Image). Elsewhere it saves a 1080 × 1350 PNG. **Copy text** copies the quote with its title.
 - **A week of candles.** The library shows the last seven days as little candles, lit for each day you read, with taller flames for longer evenings, plus today's minutes and your streak. Only time with the page open and turning counts. The diary syncs with your settings.
 - **Fall-asleep timer.** In the ambient sound panel, **Fade out: 15 / 30 / 60 min** fades the rain (or fire, or ocean) out gently, so it doesn't play all night.
 
@@ -139,9 +140,8 @@ library-app/public/audio/
 ## Ideas for the next version
 
 1. Live updates while both devices are open (Supabase Realtime) instead of a once-a-minute sync.
-2. Quote cards: turn a highlight into a pretty image to send each other.
-3. A "reading together" nudge: when both of you are in the same shared book, a small shared progress ribbon.
-4. A yearly reading calendar or "memories" shelf with dates finished and favourite quotes.
-5. Offline install as a PWA (service worker plus an app icon on the home screen).
-6. Text-to-speech read-aloud with a bedtime timer.
-7. Real recorded ambience and page sounds (see *Audio assets*).
+2. A "reading together" nudge: when both of you are in the same shared book, a small shared progress ribbon.
+3. A yearly reading calendar or "memories" shelf with dates finished and favourite quotes.
+4. Offline install as a PWA (service worker plus an app icon on the home screen).
+5. Text-to-speech read-aloud with a bedtime timer.
+6. Real recorded ambience and page sounds (see *Audio assets*).

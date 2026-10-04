@@ -170,6 +170,7 @@ export function ContentsPanel(props: {
   partnerHighlights: PartnerHighlight[];
   onGoHighlight(h: Highlight): void;
   onEraseHighlight(h: Highlight): void;
+  onQuoteHighlight(h: Highlight | PartnerHighlight): void;
   onClose(): void;
   initialTab?: Tab;
 }) {
@@ -266,11 +267,16 @@ export function ContentsPanel(props: {
                   <span className={`hlist__text hl--${h.color}`}>{h.text.length > 220 ? h.text.slice(0, 220) + '…' : h.text}</span>
                   {h.note && <span className="hlist__note">{h.note}</span>}
                 </button>
-                {!theirs && (
-                  <button className="icon-btn icon-btn--small" onClick={() => props.onEraseHighlight(h)} aria-label="Erase highlight" title="Erase">
-                    <Icon name="eraser" size={16} />
+                <div className="hlist__tools">
+                  <button className="icon-btn icon-btn--small" onClick={() => props.onQuoteHighlight(h)} aria-label="Make a quote card" title="Quote card">
+                    <Icon name="quote" size={16} />
                   </button>
-                )}
+                  {!theirs && (
+                    <button className="icon-btn icon-btn--small" onClick={() => props.onEraseHighlight(h)} aria-label="Erase highlight" title="Erase">
+                      <Icon name="eraser" size={16} />
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
         </ul>

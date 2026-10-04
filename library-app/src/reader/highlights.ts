@@ -65,6 +65,30 @@ export function rangeFor(root: Element, start: number, end: number): Range | nul
   return startSet ? range : null;
 }
 
+const BLOCK = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|SECTION|HEADER|FIGCAPTION|PRE|TD|TH|DT|DD)$/;
+
+/** The text of [start, end), with a line break wherever it crosses into a new paragraph. */
+export function textBetween(root: Element, start: number, end: number): string {
+  let total = 0;
+  let out = '';
+  let lastBlock: Element | null = null;
+  for (const t of textNodes(root)) {
+    const len = t.length;
+    const s = Math.max(start, total);
+    const e = Math.min(end, total + len);
+    if (e > s) {
+      let block: Element | null = t.parentElement;
+      while (block && block !== root && !BLOCK.test(block.tagName)) block = block.parentElement;
+      if (lastBlock && block !== lastBlock && !/\s$/.test(out)) out += '\n';
+      out += t.data.slice(s - total, e - total);
+      lastBlock = block;
+    }
+    total += len;
+    if (total >= end) break;
+  }
+  return out.replace(/[ \t]+\n/g, '\n').trim();
+}
+
 /** Wrap each painted range in <mark> elements. The template element keeps it inert. */
 export function paintHtml(html: string, paints: Paint[]): string {
   if (!paints.length) return html;

@@ -1564,3 +1564,131 @@ mark.hl mark.hl {
 .hlist .icon-btn {
   margin-top: 8px;
 }
+
+/* ---------------- quote cards ---------------- */
+
+.hlpop__card {
+  margin: 8px 4px 0;
+  color: #8c2f39;
+  text-decoration: none;
+}
+.hlist__tools {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+.qcard-scrim {
+  z-index: 90;
+}
+.qcard {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 260px;
+  gap: 24px;
+  align-items: center;
+  max-width: calc(100vw - 32px);
+  padding: 22px;
+  border-radius: 20px;
+  background: var(--grain), #f6eedd;
+  color: #2b2018;
+  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.7);
+  color-scheme: light;
+}
+.qcard__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #6e5c4a;
+}
+.qcard__preview {
+  position: relative;
+  height: min(72vh, 640px);
+  aspect-ratio: 1080 / 1350;
+}
+.qcard__preview img,
+.qcard__loading {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 6px;
+  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.5);
+}
+.qcard__loading {
+  background: linear-gradient(110deg, #ece1c8 30%, #f6eedd 50%, #ece1c8 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.qcard__toast {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(24, 16, 11, 0.85);
+  color: var(--cream);
+  font-size: 13px;
+}
+.qcard__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.qcard__styles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.qcard__style {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 70px;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s;
+}
+.qcard__style span {
+  font-family: var(--serif);
+  font-size: 34px;
+  line-height: 0.8;
+}
+.qcard__style small {
+  font-size: 10.5px;
+  opacity: 0.85;
+}
+.qcard__style.is-on {
+  box-shadow: 0 0 0 2px #2b2018;
+  transform: translateY(-2px);
+}
+.qcard__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qcard__note span {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 720px) {
+  .qcard {
+    grid-template-columns: 1fr;
+    padding: 18px 16px 16px;
+    gap: 14px;
+  }
+  .qcard__preview {
+    height: auto;
+    width: min(100%, calc((100vh - 300px) * 0.8));
+    margin: 0 auto;
+  }
+  .qcard__actions {
+    flex-direction: row;
+  }
+  .qcard__actions .btn {
+    flex: 1;
+    padding: 0 10px;
+  }
+}
